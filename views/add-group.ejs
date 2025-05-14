@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Add New Group - <%= getYearLevelText(yearLevel) %></title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <div class="header-container">
+            <a href="/year/<%= yearLevel %>" class="back-btn">← Back to Groups</a>
+            <h1>Add New <%= getYearLevelText(yearLevel) %> Group</h1>
+        </div>
+        <div class="add-group-form-container">
+            <form id="add-group-form" class="add-group-form">
+                <input type="hidden" id="yearLevel" value="<%= yearLevel %>">
+                
+                <div class="form-group">
+                    <label for="groupNumber">Group Number:</label>
+                    <input type="number" id="groupNumber" required min="1" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="projectTitle">Project Title:</label>
+                    <input type="text" id="projectTitle" required class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label for="docsLink">Documentation Link:</label>
+                    <input type="url" id="docsLink" required class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label>Group Members:</label>
+                    <div id="members-container">
+                        <div class="member-input">
+                            <input type="text" class="member-name form-input" placeholder="Member Name" required>
+                            <input type="text" class="member-id form-input" placeholder="Student ID" required>
+                        </div>
+                    </div>
+                    <button type="button" id="add-member" class="secondary-btn">Add Member</button>
+                </div>
+
+                <div class="form-actions">
+                    <button type="submit" class="submit-btn">Create Group</button>
+                    <a href="/year/<%= yearLevel %>" class="cancel-btn">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script type="module">
+        import { collection, addDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { db } from '/js/firebase-config.js';
+
+        // Add member row
+        const addMemberRow = () => {
+            const memberInput = document.createElement('div');
+            memberInput.className = 'member-input';
+            memberInput.innerHTML = `
+                <input type="text" class="member-name form-input" placeholder="Member Name" required>
+                <input type="text" class="member-id form-input" placeholder="Student ID" required>
+                <button type="button" class="remove-member" onclick="this.parentElement.remove()">×</button>
+            `;
+            document.getElementById('members-container').appendChild(memberInput);
+        };
+
+        // Handle form submission
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            console.log('Form submission started');
+            
+            try {
+                // Gather member information
+                const memberInputs = document.querySelectorAll('.member-input');
+                const members = Array.from(memberInputs).map(input => ({
+                    name: input.querySelector('.member-name').value,
+                    studentId: input.querySelector('.member-id').value
+                }));
+
+                console.log('Members data:', members);
+
+                // Create group data
+                const groupData = {
+                    yearLevel: Number(document.getElementById('yearLevel').value),
+                    groupNumber: Number(document.getElementById('groupNumber').value),
+                    projectTitle: document.getElementById('projectTitle').value,
+                    docsLink: document.getElementById('docsLink').value,
+                    members: members,
+                    createdAt: new Date().toISOString()
+                };
+
+                console.log('Group data to be submitted:', groupData);
+
+                // Add to Firestore
+                console.log('Attempting to add to Firestore...');
+                const docRef = await addDoc(collection(db, 'groups'), groupData);
+                console.log('Document written with ID:', docRef.id);
+                
+                alert('Group created successfully!');
+                window.location.href = `/year/${groupData.yearLevel}`;
+            } catch (error) {
+                console.error('Detailed error:', error);
+                console.error('Error stack:', error.stack);
+                alert(`Error creating group: ${error.message}. Please check the console for more details.`);
+            }
+        };
+
+        // Initialize event listeners
+        document.addEventListener('DOMContentLoaded', () => {
+            console.log('Page loaded, setting up event listeners');
+            
+            const form = document.getElementById('add-group-form');
+            const addMemberBtn = document.getElementById('add-member');
+            
+            if (form && addMemberBtn) {
+                console.log('Found form and add member button');
+                addMemberBtn.addEventListener('click', addMemberRow);
+                form.addEventListener('submit', handleSubmit);
+            } else {
+                console.error('Could not find form or add member button');
+            }
+        });
+    </script>
+</body>
+</html> 

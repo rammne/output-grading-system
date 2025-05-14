@@ -1,0 +1,367 @@
+/* Global Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 2rem;
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+    margin-bottom: 2rem;
+}
+
+/* Group Cards */
+.groups-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+}
+
+.group-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    transition: transform 0.2s ease;
+}
+
+.group-card:hover {
+    transform: translateY(-5px);
+}
+
+.group-card h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.group-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+}
+
+.docs-link, .grade-btn {
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    text-decoration: none;
+    text-align: center;
+    flex: 1;
+    transition: background-color 0.2s ease;
+}
+
+.docs-link {
+    background-color: #3498db;
+    color: white;
+}
+
+.grade-btn {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.docs-link:hover, .grade-btn:hover {
+    opacity: 0.9;
+}
+
+/* Rubric Form */
+.rubric-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.criterion {
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 1px solid #eee;
+}
+
+.criterion h3 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+.criterion p {
+    color: #666;
+    margin-bottom: 1rem;
+}
+
+.score-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    color: #2c3e50;
+}
+
+textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    resize: vertical;
+}
+
+.total-score {
+    font-size: 1.2rem;
+    font-weight: bold;
+    margin: 1rem 0;
+    color: #2c3e50;
+}
+
+.submit-btn {
+    background-color: #2ecc71;
+    color: white;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+    width: 100%;
+    transition: background-color 0.2s ease;
+}
+
+.submit-btn:hover {
+    background-color: #27ae60;
+}
+
+/* Group Info */
+#group-info {
+    margin-bottom: 2rem;
+    padding: 1rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+#group-info h2 {
+    color: #2c3e50;
+    margin-bottom: 0.5rem;
+}
+
+#group-info a {
+    color: #3498db;
+    text-decoration: none;
+}
+
+#group-info a:hover {
+    text-decoration: underline;
+}
+
+/* Add Group Form */
+.add-group-form-container {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.add-group-form {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.form-input {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+    margin-top: 0.25rem;
+}
+
+.member-input {
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
+    gap: 1rem;
+    margin-bottom: 1rem;
+    align-items: center;
+}
+
+.remove-member {
+    background: #e74c3c;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    width: 30px;
+    height: 30px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.remove-member:hover {
+    background: #c0392b;
+}
+
+.secondary-btn {
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    cursor: pointer;
+    font-size: 1rem;
+    margin-top: 1rem;
+}
+
+.secondary-btn:hover {
+    background: #2980b9;
+}
+
+.form-actions {
+    display: flex;
+    gap: 1rem;
+    margin-top: 2rem;
+}
+
+.cancel-btn {
+    background: #95a5a6;
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    flex: 1;
+    text-align: center;
+    transition: background-color 0.2s ease;
+}
+
+.cancel-btn:hover {
+    background: #7f8c8d;
+}
+
+/* Add button to homepage */
+.add-group-btn {
+    display: inline-block;
+    background: #2ecc71;
+    color: white;
+    text-decoration: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+    transition: background-color 0.2s ease;
+}
+
+.add-group-btn:hover {
+    background: #27ae60;
+}
+
+.project-title {
+    font-size: 1.1rem;
+    color: #34495e;
+    margin-bottom: 1rem;
+}
+
+.members-list {
+    margin: 1rem 0;
+    padding: 1rem;
+    background: #f8f9fa;
+    border-radius: 4px;
+}
+
+.members-list h3 {
+    color: #2c3e50;
+    font-size: 1rem;
+    margin-bottom: 0.5rem;
+}
+
+.members-list ul {
+    list-style: none;
+    padding: 0;
+}
+
+.members-list li {
+    color: #34495e;
+    padding: 0.25rem 0;
+    font-size: 0.9rem;
+}
+
+/* Year Level Selection */
+.year-levels-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 2rem;
+    margin-top: 2rem;
+}
+
+.year-level-card {
+    background: white;
+    border-radius: 8px;
+    padding: 2rem;
+    text-align: center;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.year-level-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.year-level-card h2 {
+    color: #2c3e50;
+    margin-bottom: 1rem;
+}
+
+.year-level-card p {
+    color: #7f8c8d;
+    font-size: 0.9rem;
+}
+
+/* Header Container */
+.header-container {
+    display: flex;
+    align-items: center;
+    margin-bottom: 2rem;
+    gap: 1rem;
+}
+
+.back-btn {
+    display: inline-flex;
+    align-items: center;
+    color: #3498db;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease;
+}
+
+.back-btn:hover {
+    color: #2980b9;
+}
+
+/* No Groups Message */
+.no-groups {
+    text-align: center;
+    padding: 2rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    color: #7f8c8d;
+}

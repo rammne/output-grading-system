@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Grade Rubric</title>
+    <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Grading Rubric</h1>
+        <div id="group-info">
+            <!-- Group info will be loaded here -->
+        </div>
+        
+        <form id="grading-form" class="rubric-form">
+            <div id="criteria-container">
+                <!-- Criteria will be dynamically loaded here -->
+            </div>
+            
+            <div class="form-group">
+                <label for="comments">Additional Comments:</label>
+                <textarea id="comments" name="comments" rows="4"></textarea>
+            </div>
+            
+            <div class="total-score">
+                Total Score: <span id="total">0</span>
+            </div>
+            
+            <button type="submit" class="submit-btn">Submit Grades</button>
+        </form>
+    </div>
+
+    <script type="module">
+        import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { db } from '/js/firebase-config.js';
+
+        const groupId = '<%= groupId %>';
+        const criteriaList = [
+            { name: 'Functionality', maxScore: 30, description: 'Does the project work as intended?' },
+            { name: 'Design', maxScore: 20, description: 'Visual appeal and user interface' },
+            { name: 'Code Quality', maxScore: 20, description: 'Code organization, readability, and best practices' },
+            { name: 'Innovation', maxScore: 15, description: 'Unique and creative solutions' },
+            { name: 'Documentation', maxScore: 15, description: 'Clear and comprehensive documentation' }
+        ];
+
+        const loadGroupInfo = async () => {
+            try {
+                const groupDoc = await getDoc(doc(db, 'groups', groupId));
+                if (groupDoc.exists()) {
+                    const group = groupDoc.data();
+                    document.getElementById('group-info').innerHTML = `
+                        <h2>Group ${group.groupNumber}</h2>
+                        <p>Project: ${group.projectTitle}</p>
+                        <a href="${group.docsLink}" target="_blank">View Documentation</a>
+                    `;
+                }
+            } catch (error) {
+                console.error("Error loading group info:", error);
+            }
+        };
+
+        const loadCriteria = () => {
+            const container = document.getElementById('criteria-container');
+            const criteriaHTML = criteriaList.map(criterion => `
+                <div class="criterion">
+                    <h3>${criterion.name} (${criterion.maxScore} points)</h3>
+                    <p>${criterion.description}</p>
+                    <input type="number" 
+                           name="${criterion.name.toLowerCase()}" 
+                           min="0" 
+                           max="${criterion.maxScore}" 
+                           class="score-input">
+                </div>
+            `).join('');
+            container.innerHTML = criteriaHTML;
+            
+            // Add event listeners to all score inputs
+            document.querySelectorAll('.score-input').forEach(input => {
+                input.addEventListener('change', updateTotal);
+            });
+        };
+
+        const updateTotal = () => {
+            const total = Array.from(document.querySelectorAll('.score-input'))
+                .reduce((sum, input) => sum + (Number(input.value) || 0), 0);
+            document.getElementById('total').textContent = total;
+        };
+
+        const handleSubmit = async (e) => {
+            e.preventDefault();
+            const scores = criteriaList.reduce((acc, criterion) => {
+                const input = document.querySelector(`input[name="${criterion.name.toLowerCase()}"]`);
+                acc[criterion.name] = Number(input.value) || 0;
+                return acc;
+            }, {});
+
+            try {
+                await setDoc(doc(db, 'grades', groupId), {
+                    scores,
+                    comments: document.getElementById('comments').value,
+                    totalScore: Number(document.getElementById('total').textContent),
+                    timestamp: new Date().toISOString()
+                });
+                alert('Grades submitted successfully!');
+                window.location.href = '/';
+            } catch (error) {
+                console.error("Error saving grades:", error);
+                alert('Error saving grades. Please try again.');
+            }
+        };
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', () => {
+            loadGroupInfo();
+            loadCriteria();
+            document.getElementById('grading-form').addEventListener('submit', handleSubmit);
+        });
+    </script>
+</body>
+</html> 

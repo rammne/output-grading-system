@@ -8,25 +8,67 @@
 </head>
 <body>
     <div class="container">
+        <div id="professor-info" class="professor-info">
+            <!-- Professor info will be loaded here -->
+        </div>
         <h1>Final Output Grading System</h1>
         <div class="year-levels-container">
-            <div class="year-level-card" onclick="window.location.href='/year/1'">
+            <div class="year-level-card" onclick="navigateToYear(1)">
                 <h2>First Year</h2>
                 <p>View and grade first year student groups</p>
             </div>
-            <div class="year-level-card" onclick="window.location.href='/year/2'">
+            <div class="year-level-card" onclick="navigateToYear(2)">
                 <h2>Second Year</h2>
                 <p>View and grade second year student groups</p>
             </div>
-            <div class="year-level-card" onclick="window.location.href='/year/3'">
+            <div class="year-level-card" onclick="navigateToYear(3)">
                 <h2>Third Year</h2>
                 <p>View and grade third year student groups</p>
             </div>
-            <div class="year-level-card" onclick="window.location.href='/year/4'">
+            <div class="year-level-card" onclick="navigateToYear(4)">
                 <h2>Fourth Year</h2>
                 <p>View and grade fourth year student groups</p>
             </div>
         </div>
     </div>
+
+    <script>
+        // Check if professor is logged in
+        const checkAuth = () => {
+            const professorId = sessionStorage.getItem('professorId');
+            const professorName = sessionStorage.getItem('professorName');
+            const department = sessionStorage.getItem('department');
+
+            if (!professorId || !professorName || !department) {
+                window.location.href = '/login';
+                return;
+            }
+
+            // Display professor info
+            const professorInfo = document.getElementById('professor-info');
+            professorInfo.innerHTML = `
+                <span class="professor-name">${professorName}</span>
+                <span class="professor-department">${department}</span>
+                <button onclick="logout()" class="logout-btn">Logout</button>
+            `;
+        };
+
+        const logout = () => {
+            sessionStorage.clear();
+            window.location.href = '/login';
+        };
+
+        const navigateToYear = (yearLevel) => {
+            const professorId = sessionStorage.getItem('professorId');
+            if (!professorId) {
+                window.location.href = '/login';
+                return;
+            }
+            window.location.href = `/year/${yearLevel}`;
+        };
+
+        // Check authentication when page loads
+        document.addEventListener('DOMContentLoaded', checkAuth);
+    </script>
 </body>
 </html> 

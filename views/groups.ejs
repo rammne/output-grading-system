@@ -4,70 +4,489 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Groups - Year <%= yearLevel %></title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="container">
+        <div id="professor-info" class="professor-info">
+            <!-- Professor info will be loaded here -->
+        </div>
         <div class="header-container">
-            <a href="/" class="back-btn">← Back to Year Levels</a>
+            <a href="/" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+                Back to Year Levels
+            </a>
             <h1><%= getYearLevelText(yearLevel) %> Groups</h1>
         </div>
-        <a href="/add-group/<%= yearLevel %>" class="add-group-btn">Add New Group</a>
+        <a href="/add-group/<%= yearLevel %>" class="add-group-btn">
+            <i class="fas fa-plus"></i>
+            Add New Group
+        </a>
         <div class="groups-container">
-            <!-- Groups will be dynamically loaded here -->
+            <!-- Loading indicator -->
+            <div class="loading-spinner">
+                <i class="fas fa-spinner fa-spin"></i>
+                <p>Loading groups...</p>
+            </div>
         </div>
     </div>
 
+    <!-- Modal for displaying grades -->
+    <div id="gradesModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-chart-bar"></i> Group Grades</h2>
+                <button class="close-modal" aria-label="Close modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div id="gradesContent" class="modal-body">
+                <!-- Loading indicator for grades -->
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading grades...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Confirmation Modal -->
+    <div id="confirmationModal" class="modal">
+        <div class="modal-content confirmation-modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-exclamation-triangle"></i> Confirm Action</h2>
+                <button class="close-modal" aria-label="Close modal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p id="confirmationMessage"></p>
+                <div class="confirmation-actions">
+                    <button id="confirmButton" class="danger-btn">Confirm</button>
+                    <button id="cancelButton" class="cancel-btn">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
+    <script>
+        // Store yearLevel from EJS in a global variable
+        const YEAR_LEVEL = parseInt('<%= yearLevel %>');
+    </script>
+    
     <script type="module">
-        import { collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { collection, query, where, getDocs, doc, deleteDoc, updateDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
         import { db } from '/js/firebase-config.js';
 
-        const yearLevel = <%= yearLevel %>;
+        // Notification function
+        const showNotification = (message, type = 'error') => {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        };
+
+        // Confirmation modal handling
+        const showConfirmationModal = (message, onConfirm) => {
+            const modal = document.getElementById('confirmationModal');
+            const messageEl = document.getElementById('confirmationMessage');
+            const confirmBtn = document.getElementById('confirmButton');
+            const cancelBtn = document.getElementById('cancelButton');
+            
+            messageEl.textContent = message;
+            modal.style.display = 'block';
+
+            const handleConfirm = () => {
+                modal.style.display = 'none';
+                onConfirm();
+                cleanup();
+            };
+
+            const handleCancel = () => {
+                modal.style.display = 'none';
+                cleanup();
+            };
+
+            const cleanup = () => {
+                confirmBtn.removeEventListener('click', handleConfirm);
+                cancelBtn.removeEventListener('click', handleCancel);
+            };
+
+            confirmBtn.addEventListener('click', handleConfirm);
+            cancelBtn.addEventListener('click', handleCancel);
+        };
+
+        const deleteGroup = async (groupId) => {
+            showConfirmationModal(
+                'Are you sure you want to delete this group? This action cannot be undone.',
+                async () => {
+                    try {
+                        await deleteDoc(doc(db, 'groups', groupId));
+                        showNotification('Group deleted successfully!', 'success');
+                        loadGroups();
+                    } catch (error) {
+                        console.error('Error deleting group:', error);
+                        showNotification('Error deleting group. Please try again.');
+                    }
+                }
+            );
+        };
+
+        const deleteMember = async (groupId, memberIndex, groupData) => {
+            showConfirmationModal(
+                'Are you sure you want to remove this member? This action cannot be undone.',
+                async () => {
+                    try {
+                        const updatedMembers = groupData.members.filter((_, index) => index !== memberIndex);
+                        await updateDoc(doc(db, 'groups', groupId), {
+                            members: updatedMembers
+                        });
+                        showNotification('Member removed successfully!', 'success');
+                        loadGroups();
+                    } catch (error) {
+                        console.error('Error removing member:', error);
+                        showNotification('Error removing member. Please try again.');
+                    }
+                }
+            );
+        };
+
+        const viewGrades = async (groupId, groupNumber) => {
+            const modal = document.getElementById('gradesModal');
+            const content = document.getElementById('gradesContent');
+            
+            // Show loading state
+            content.innerHTML = `
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading grades...</p>
+                </div>
+            `;
+            modal.style.display = 'block';
+
+            try {
+                const gradesQuery = query(
+                    collection(db, 'grades'),
+                    where('groupId', '==', groupId)
+                );
+                
+                const querySnapshot = await getDocs(gradesQuery);
+                const grades = querySnapshot.docs.map(doc => doc.data());
+                
+                // Calculate average scores for each criterion
+                const criteriaAverages = {};
+                const totalScores = [];
+                
+                grades.forEach(grade => {
+                    Object.entries(grade.scores).forEach(([criterion, score]) => {
+                        if (!criteriaAverages[criterion]) {
+                            criteriaAverages[criterion] = [];
+                        }
+                        criteriaAverages[criterion].push(score);
+                    });
+                    totalScores.push(grade.totalScore);
+                });
+
+                // Generate HTML for grades
+                let gradesHTML = `
+                    <div class="grades-header">
+                        <h3><i class="fas fa-users"></i> Group ${groupNumber} Grades</h3>
+                        <span class="grades-count">${grades.length} grade${grades.length !== 1 ? 's' : ''} submitted</span>
+                    </div>
+                `;
+                
+                if (grades.length === 0) {
+                    gradesHTML += `
+                        <div class="no-grades">
+                            <i class="fas fa-clipboard-list"></i>
+                            <p>No grades submitted yet.</p>
+                        </div>
+                    `;
+                } else {
+                    // Individual professor grades
+                    gradesHTML += '<div class="professors-grades">';
+                    grades.forEach(grade => {
+                        gradesHTML += `
+                            <div class="professor-grade">
+                                <div class="professor-info">
+                                    <h4><i class="fas fa-user-tie"></i> ${grade.professorName}</h4>
+                                    <p class="department"><i class="fas fa-building"></i> ${grade.department}</p>
+                                </div>
+                                <div class="scores-list">
+                                    ${Object.entries(grade.scores).map(([criterion, score]) => `
+                                        <div class="score-item">
+                                            <span class="criterion">${criterion}:</span>
+                                            <span class="score">${score}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="total-score">
+                                    <i class="fas fa-star"></i>
+                                    Total: ${grade.totalScore}
+                                </div>
+                                <div class="comments">
+                                    <strong><i class="fas fa-comment"></i> Comments:</strong>
+                                    <p>${grade.comments || 'No comments'}</p>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    gradesHTML += '</div>';
+
+                    // Average scores
+                    const averages = Object.entries(criteriaAverages).map(([criterion, scores]) => {
+                        const avg = scores.reduce((a, b) => a + b, 0) / scores.length;
+                        return `
+                            <div class="average-item">
+                                <span class="criterion">${criterion}:</span>
+                                <span class="score">${avg.toFixed(2)}</span>
+                            </div>
+                        `;
+                    }).join('');
+
+                    const totalAvg = totalScores.reduce((a, b) => a + b, 0) / totalScores.length;
+
+                    gradesHTML += `
+                        <div class="averages-section">
+                            <h4><i class="fas fa-calculator"></i> Average Scores</h4>
+                            <div class="averages-list">
+                                ${averages}
+                            </div>
+                            <div class="total-average">
+                                <i class="fas fa-award"></i>
+                                Average Total Score: ${totalAvg.toFixed(2)}
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // Display in modal
+                content.innerHTML = gradesHTML;
+            } catch (error) {
+                console.error('Error loading grades:', error);
+                content.innerHTML = `
+                    <div class="error-message">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>Error loading grades. Please try again.</p>
+                    </div>
+                `;
+            }
+        };
 
         const loadGroups = async () => {
             const groupsContainer = document.querySelector('.groups-container');
+            groupsContainer.innerHTML = `
+                <div class="loading-spinner">
+                    <i class="fas fa-spinner fa-spin"></i>
+                    <p>Loading groups...</p>
+                </div>
+            `;
+
             try {
                 // Create a query to filter groups by year level
                 const groupsQuery = query(
                     collection(db, 'groups'),
-                    where('yearLevel', '==', yearLevel)
+                    where('yearLevel', '==', YEAR_LEVEL)
                 );
                 
                 const querySnapshot = await getDocs(groupsQuery);
                 const groupElements = querySnapshot.docs.map(doc => {
                     const group = doc.data();
-                    const membersList = group.members?.map(member => 
-                        `<li>${member.name} (${member.studentId})</li>`
+                    const membersList = group.members?.map((member, index) => 
+                        `<li>
+                            <i class="fas fa-user-graduate"></i>
+                            ${member.name} 
+                            <span class="student-id">(${member.studentId})</span>
+                            <button type="button" class="delete-member-btn" 
+                                onclick="deleteMember('${doc.id}', ${index}, ${JSON.stringify(group).replace(/"/g, '&quot;')})">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </li>`
                     ).join('') || '';
                     
                     return `
                         <div class="group-card">
-                            <h2>Group ${group.groupNumber}</h2>
-                            <p class="project-title">${group.projectTitle}</p>
+                            <div class="group-header">
+                                <h2><i class="fas fa-users"></i> Group ${group.groupNumber}</h2>
+                                <button type="button" class="delete-group-btn" onclick="deleteGroup('${doc.id}')">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                            </div>
+                            <p class="project-title">
+                                <i class="fas fa-project-diagram"></i>
+                                ${group.projectTitle}
+                            </p>
                             <div class="members-list">
-                                <h3>Members:</h3>
+                                <h3><i class="fas fa-user-friends"></i> Members</h3>
                                 <ul>${membersList}</ul>
                             </div>
                             <div class="group-actions">
-                                <a href="${group.docsLink}" target="_blank" class="docs-link">View Documentation</a>
-                                <a href="/group/${doc.id}/rubric" class="grade-btn">Grade Project</a>
+                                <a href="${group.docsLink}" target="_blank" class="docs-link">
+                                    <i class="fas fa-file-alt"></i>
+                                    View Documentation
+                                </a>
+                                <a href="/group/${doc.id}/rubric" class="grade-btn">
+                                    <i class="fas fa-clipboard-check"></i>
+                                    Grade Project
+                                </a>
+                                <button type="button" class="view-grades-btn" onclick="viewGrades('${doc.id}', ${group.groupNumber})">
+                                    <i class="fas fa-chart-bar"></i>
+                                    View All Grades
+                                </button>
                             </div>
                         </div>
                     `;
                 });
 
                 if (groupElements.length === 0) {
-                    groupsContainer.innerHTML = '<p class="no-groups">No groups found for this year level. Add a new group to get started.</p>';
+                    groupsContainer.innerHTML = `
+                        <div class="no-groups">
+                            <i class="fas fa-users-slash"></i>
+                            <p>No groups found for this year level.</p>
+                            <p>Add a new group to get started.</p>
+                        </div>
+                    `;
                 } else {
                     groupsContainer.innerHTML = groupElements.join('');
                 }
             } catch (error) {
                 console.error("Error loading groups:", error);
-                groupsContainer.innerHTML = '<p class="error">Error loading groups. Please try again later.</p>';
+                groupsContainer.innerHTML = `
+                    <div class="error">
+                        <i class="fas fa-exclamation-circle"></i>
+                        <p>Error loading groups. Please try again later.</p>
+                    </div>
+                `;
             }
         };
 
+        // Make functions available globally
+        globalThis.deleteGroup = deleteGroup;
+        globalThis.deleteMember = deleteMember;
+        globalThis.viewGrades = viewGrades;
+
+        // Modal functionality
+        const setupModal = (modalId) => {
+            const modal = document.getElementById(modalId);
+            const closeBtns = modal.querySelectorAll('.close-modal');
+
+            closeBtns.forEach(btn => {
+                btn.onclick = () => {
+                    modal.style.display = 'none';
+                };
+            });
+
+            return modal;
+        };
+
+        const gradesModal = setupModal('gradesModal');
+        const confirmationModal = setupModal('confirmationModal');
+
+        window.onclick = (event) => {
+            if (event.target === gradesModal) {
+                gradesModal.style.display = 'none';
+            }
+            if (event.target === confirmationModal) {
+                confirmationModal.style.display = 'none';
+            }
+        };
+
+        // Initialize
         document.addEventListener('DOMContentLoaded', loadGroups);
     </script>
+
+    <style>
+        .loading-spinner {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+        }
+
+        .loading-spinner i {
+            font-size: 2rem;
+            margin-bottom: 1rem;
+            color: var(--primary);
+        }
+
+        .grades-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+        }
+
+        .grades-count {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .no-grades, .error-message {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-light);
+        }
+
+        .no-grades i, .error-message i {
+            font-size: 3rem;
+            margin-bottom: 1rem;
+            color: var(--text-light);
+        }
+
+        .confirmation-modal {
+            max-width: 400px;
+        }
+
+        .confirmation-actions {
+            display: flex;
+            gap: 1rem;
+            justify-content: flex-end;
+            margin-top: 1.5rem;
+        }
+
+        .danger-btn {
+            background-color: var(--error);
+            color: white;
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 500;
+            transition: var(--transition);
+        }
+
+        .danger-btn:hover {
+            background-color: #d32f2f;
+        }
+
+        .student-id {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        @media (max-width: 768px) {
+            .grades-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .confirmation-actions {
+                flex-direction: column;
+            }
+
+            .danger-btn, .cancel-btn {
+                width: 100%;
+                text-align: center;
+            }
+        }
+    </style>
 </body>
 </html> 

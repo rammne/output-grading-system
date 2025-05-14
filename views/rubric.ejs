@@ -4,13 +4,42 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Grade Rubric</title>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <link rel="stylesheet" href="/style.css">
 </head>
 <body>
     <div class="container">
-        <h1>Grading Rubric</h1>
-        <div id="group-info">
+        <div id="professor-info" class="professor-info">
+            <!-- Professor info will be loaded here -->
+        </div>
+        <div class="header-container">
+            <a href="/" class="back-btn">
+                <i class="fas fa-arrow-left"></i>
+                Back to Groups
+            </a>
+            <h1>Grading Rubric</h1>
+        </div>
+        <div id="group-info" class="group-info-card">
             <!-- Group info will be loaded here -->
+        </div>
+
+        <!-- Rubric Management Section -->
+        <div class="rubric-management">
+            <div class="rubric-selector">
+                <h3>
+                    <i class="fas fa-list-check"></i>
+                    Select Rubric
+                </h3>
+                <select id="rubricSelect" class="rubric-select">
+                    <option value="default">Default Rubric</option>
+                    <!-- Custom rubrics will be loaded here -->
+                </select>
+                <button type="button" class="create-rubric-btn" onclick="showRubricModal()">
+                    <i class="fas fa-plus"></i>
+                    Create New Rubric
+                </button>
+            </div>
         </div>
         
         <form id="grading-form" class="rubric-form">
@@ -18,25 +47,74 @@
                 <!-- Criteria will be dynamically loaded here -->
             </div>
             
-            <div class="form-group">
-                <label for="comments">Additional Comments:</label>
-                <textarea id="comments" name="comments" rows="4"></textarea>
+            <div class="form-group comments-section">
+                <label for="comments">
+                    <i class="fas fa-comment"></i>
+                    Additional Comments:
+                </label>
+                <textarea id="comments" name="comments" rows="4" placeholder="Enter your feedback and comments here..."></textarea>
             </div>
             
             <div class="total-score">
-                Total Score: <span id="total">0</span>
+                <i class="fas fa-star"></i>
+                Total Score: <span id="total">0</span>/<span id="maxTotal">100</span>
             </div>
             
-            <button type="submit" class="submit-btn">Submit Grades</button>
+            <button type="submit" class="submit-btn">
+                <i class="fas fa-check"></i>
+                Submit Grades
+            </button>
         </form>
     </div>
 
+    <!-- Create Rubric Modal -->
+    <div id="rubricModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2><i class="fas fa-plus-circle"></i> Create New Rubric</h2>
+                <button class="close-modal" onclick="closeRubricModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <form id="createRubricForm" class="create-rubric-form">
+                    <div class="form-group">
+                        <label for="rubricName">
+                            <i class="fas fa-tag"></i>
+                            Rubric Name
+                        </label>
+                        <input type="text" id="rubricName" required class="form-input" placeholder="Enter rubric name">
+                    </div>
+
+                    <div id="criteriaList">
+                        <!-- Criteria inputs will be added here -->
+                    </div>
+
+                    <button type="button" class="add-criterion-btn" onclick="addCriterion()">
+                        <i class="fas fa-plus"></i>
+                        Add Criterion
+                    </button>
+
+                    <div class="form-actions">
+                        <button type="submit" class="submit-btn">
+                            <i class="fas fa-save"></i>
+                            Save Rubric
+                        </button>
+                        <button type="button" class="cancel-btn" onclick="closeRubricModal()">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="notification" class="notification"></div>
+
     <script type="module">
-        import { doc, getDoc, setDoc } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
         import { db } from '/js/firebase-config.js';
 
         const groupId = '<%= groupId %>';
-        const criteriaList = [
+        const defaultCriteria = [
             { name: 'Functionality', maxScore: 30, description: 'Does the project work as intended?' },
             { name: 'Design', maxScore: 20, description: 'Visual appeal and user interface' },
             { name: 'Code Quality', maxScore: 20, description: 'Code organization, readability, and best practices' },
@@ -44,40 +122,179 @@
             { name: 'Documentation', maxScore: 15, description: 'Clear and comprehensive documentation' }
         ];
 
+        let currentCriteria = defaultCriteria;
+
+        // Check authentication
+        const checkAuth = () => {
+            const professorId = sessionStorage.getItem('professorId');
+            const professorName = sessionStorage.getItem('professorName');
+            const department = sessionStorage.getItem('department');
+
+            if (!professorId || !professorName || !department) {
+                window.location.href = '/login';
+                return;
+            }
+
+            // Display professor info
+            const professorInfo = document.getElementById('professor-info');
+            professorInfo.innerHTML = `
+                <span class="professor-name">${professorName}</span>
+                <span class="professor-department">${department}</span>
+                <button onclick="logout()" class="logout-btn">Logout</button>
+            `;
+
+            return { professorId, professorName, department };
+        };
+
+        const showNotification = (message, type = 'error') => {
+            const notification = document.getElementById('notification');
+            notification.textContent = message;
+            notification.className = `notification ${type}`;
+            notification.style.display = 'block';
+            
+            setTimeout(() => {
+                notification.style.display = 'none';
+            }, 3000);
+        };
+
         const loadGroupInfo = async () => {
             try {
                 const groupDoc = await getDoc(doc(db, 'groups', groupId));
                 if (groupDoc.exists()) {
                     const group = groupDoc.data();
                     document.getElementById('group-info').innerHTML = `
-                        <h2>Group ${group.groupNumber}</h2>
-                        <p>Project: ${group.projectTitle}</p>
-                        <a href="${group.docsLink}" target="_blank">View Documentation</a>
+                        <div class="group-header">
+                            <h2><i class="fas fa-users"></i> Group ${group.groupNumber}</h2>
+                        </div>
+                        <div class="project-info">
+                            <p class="project-title">
+                                <i class="fas fa-project-diagram"></i>
+                                ${group.projectTitle}
+                            </p>
+                            <a href="${group.docsLink}" target="_blank" class="docs-link">
+                                <i class="fas fa-file-alt"></i>
+                                View Documentation
+                            </a>
+                        </div>
                     `;
                 }
             } catch (error) {
                 console.error("Error loading group info:", error);
+                showNotification("Error loading group info. Please try again.");
+            }
+        };
+
+        const loadExistingGrade = async (professorId) => {
+            try {
+                const gradesQuery = query(
+                    collection(db, 'grades'),
+                    where('groupId', '==', groupId),
+                    where('professorId', '==', professorId)
+                );
+                
+                const querySnapshot = await getDocs(gradesQuery);
+                if (!querySnapshot.empty) {
+                    const gradeData = querySnapshot.docs[0].data();
+                    
+                    // Fill in existing scores
+                    Object.entries(gradeData.scores).forEach(([criterion, score]) => {
+                        const input = document.querySelector(`input[name="${criterion.toLowerCase()}"]`);
+                        if (input) input.value = score;
+                    });
+                    
+                    // Fill in comments
+                    document.getElementById('comments').value = gradeData.comments || '';
+                    
+                    // Update total
+                    updateTotal();
+                }
+            } catch (error) {
+                console.error("Error loading existing grade:", error);
+            }
+        };
+
+        const loadRubrics = async (professorId) => {
+            try {
+                const rubricsQuery = query(
+                    collection(db, 'rubrics'),
+                    where('professorId', '==', professorId)
+                );
+                
+                const querySnapshot = await getDocs(rubricsQuery);
+                const select = document.getElementById('rubricSelect');
+                
+                querySnapshot.forEach(doc => {
+                    const rubric = doc.data();
+                    const option = document.createElement('option');
+                    option.value = doc.id;
+                    option.textContent = rubric.name;
+                    select.appendChild(option);
+                });
+            } catch (error) {
+                console.error("Error loading rubrics:", error);
+                showNotification("Error loading rubrics");
+            }
+        };
+
+        const handleRubricChange = async (event) => {
+            const rubricId = event.target.value;
+            
+            if (rubricId === 'default') {
+                currentCriteria = defaultCriteria;
+                loadCriteria();
+                return;
+            }
+
+            try {
+                const rubricDoc = await getDoc(doc(db, 'rubrics', rubricId));
+                if (rubricDoc.exists()) {
+                    currentCriteria = rubricDoc.data().criteria;
+                    loadCriteria();
+                }
+            } catch (error) {
+                console.error("Error loading rubric:", error);
+                showNotification("Error loading rubric");
             }
         };
 
         const loadCriteria = () => {
             const container = document.getElementById('criteria-container');
-            const criteriaHTML = criteriaList.map(criterion => `
-                <div class="criterion">
-                    <h3>${criterion.name} (${criterion.maxScore} points)</h3>
-                    <p>${criterion.description}</p>
-                    <input type="number" 
-                           name="${criterion.name.toLowerCase()}" 
-                           min="0" 
-                           max="${criterion.maxScore}" 
-                           class="score-input">
+            const criteriaHTML = currentCriteria.map(criterion => `
+                <div class="criterion-card">
+                    <div class="criterion-header">
+                        <h3>
+                            <i class="fas fa-clipboard-check"></i>
+                            ${criterion.name}
+                        </h3>
+                        <span class="max-score">${criterion.maxScore} points</span>
+                    </div>
+                    <p class="criterion-description">${criterion.description}</p>
+                    <div class="score-input-container">
+                        <input type="number" 
+                               name="${criterion.name.toLowerCase()}" 
+                               min="0" 
+                               max="${criterion.maxScore}" 
+                               class="score-input"
+                               placeholder="Enter score">
+                        <span class="max-score-label">/ ${criterion.maxScore}</span>
+                    </div>
                 </div>
             `).join('');
             container.innerHTML = criteriaHTML;
+
+            // Update max total
+            const maxTotal = currentCriteria.reduce((sum, criterion) => sum + criterion.maxScore, 0);
+            document.getElementById('maxTotal').textContent = maxTotal;
             
             // Add event listeners to all score inputs
             document.querySelectorAll('.score-input').forEach(input => {
                 input.addEventListener('change', updateTotal);
+                input.addEventListener('input', function() {
+                    const max = parseInt(this.max);
+                    const value = parseInt(this.value);
+                    if (value > max) this.value = max;
+                    if (value < 0) this.value = 0;
+                });
             });
         };
 
@@ -89,33 +306,514 @@
 
         const handleSubmit = async (e) => {
             e.preventDefault();
-            const scores = criteriaList.reduce((acc, criterion) => {
-                const input = document.querySelector(`input[name="${criterion.name.toLowerCase()}"]`);
-                acc[criterion.name] = Number(input.value) || 0;
-                return acc;
-            }, {});
+            
+            const professor = checkAuth();
+            if (!professor) return;
+
+            // Validate all scores are entered
+            const emptyScores = Array.from(document.querySelectorAll('.score-input'))
+                .some(input => !input.value);
+            
+            if (emptyScores) {
+                showNotification('Please enter scores for all criteria');
+                return;
+            }
+
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            const originalText = submitBtn.innerHTML;
+            submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Submitting...';
+            submitBtn.disabled = true;
 
             try {
-                await setDoc(doc(db, 'grades', groupId), {
+                const scores = currentCriteria.reduce((acc, criterion) => {
+                    const input = document.querySelector(`input[name="${criterion.name.toLowerCase()}"]`);
+                    acc[criterion.name] = Number(input.value) || 0;
+                    return acc;
+                }, {});
+
+                // Use a compound ID to ensure one grade per professor per group
+                const gradeId = `${groupId}_${professor.professorId}`;
+                
+                await setDoc(doc(db, 'grades', gradeId), {
+                    groupId,
+                    professorId: professor.professorId,
+                    professorName: professor.professorName,
+                    department: professor.department,
                     scores,
                     comments: document.getElementById('comments').value,
                     totalScore: Number(document.getElementById('total').textContent),
                     timestamp: new Date().toISOString()
                 });
-                alert('Grades submitted successfully!');
-                window.location.href = '/';
+                
+                showNotification('Grades submitted successfully!', 'success');
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 1000);
             } catch (error) {
                 console.error("Error saving grades:", error);
-                alert('Error saving grades. Please try again.');
+                showNotification('Error saving grades. Please try again.');
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
             }
         };
 
         // Initialize the page
-        document.addEventListener('DOMContentLoaded', () => {
-            loadGroupInfo();
+        document.addEventListener('DOMContentLoaded', async () => {
+            const professor = checkAuth();
+            if (!professor) return;
+            
+            await loadGroupInfo();
+            await loadRubrics(professor.professorId);
             loadCriteria();
+            await loadExistingGrade(professor.professorId);
+            
             document.getElementById('grading-form').addEventListener('submit', handleSubmit);
+            document.getElementById('rubricSelect').addEventListener('change', handleRubricChange);
+            document.getElementById('createRubricForm').addEventListener('submit', handleRubricSubmit);
         });
+
+        // Make functions available globally
+        window.logout = () => {
+            sessionStorage.clear();
+            window.location.href = '/login';
+        };
+
+        window.showRubricModal = () => {
+            document.getElementById('rubricModal').style.display = 'block';
+            document.getElementById('criteriaList').innerHTML = '';
+            addCriterion(); // Add first criterion by default
+        };
+
+        window.closeRubricModal = () => {
+            document.getElementById('rubricModal').style.display = 'none';
+        };
+
+        window.addCriterion = () => {
+            const criteriaList = document.getElementById('criteriaList');
+            const criterionDiv = document.createElement('div');
+            criterionDiv.className = 'criterion-input';
+            criterionDiv.innerHTML = `
+                <div class="criterion-input-header">
+                    <h4>Criterion ${criteriaList.children.length + 1}</h4>
+                    <button type="button" class="remove-criterion-btn" onclick="this.parentElement.parentElement.remove()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="form-group">
+                    <input type="text" class="form-input criterion-name" placeholder="Criterion name" required>
+                </div>
+                <div class="form-group">
+                    <input type="number" class="form-input criterion-score" placeholder="Max score" required min="1">
+                </div>
+                <div class="form-group">
+                    <textarea class="criterion-desc" placeholder="Criterion description" required></textarea>
+                </div>
+            `;
+            criteriaList.appendChild(criterionDiv);
+        };
+
+        const handleRubricSubmit = async (e) => {
+            e.preventDefault();
+            
+            const professor = checkAuth();
+            if (!professor) return;
+
+            const rubricName = document.getElementById('rubricName').value.trim();
+            const criteriaInputs = document.querySelectorAll('.criterion-input');
+            const criteria = Array.from(criteriaInputs).map(input => ({
+                name: input.querySelector('.criterion-name').value.trim(),
+                maxScore: parseInt(input.querySelector('.criterion-score').value),
+                description: input.querySelector('.criterion-desc').value.trim()
+            }));
+
+            try {
+                const rubricRef = doc(collection(db, 'rubrics'));
+                await setDoc(rubricRef, {
+                    name: rubricName,
+                    professorId: professor.professorId,
+                    criteria,
+                    createdAt: new Date().toISOString()
+                });
+
+                showNotification('Rubric created successfully!', 'success');
+                closeRubricModal();
+                
+                // Add new rubric to select options
+                const select = document.getElementById('rubricSelect');
+                const option = document.createElement('option');
+                option.value = rubricRef.id;
+                option.textContent = rubricName;
+                select.appendChild(option);
+                
+                // Select the new rubric
+                select.value = rubricRef.id;
+                currentCriteria = criteria;
+                loadCriteria();
+            } catch (error) {
+                console.error("Error creating rubric:", error);
+                showNotification('Error creating rubric. Please try again.');
+            }
+        };
+
+        window.handleRubricSubmit = handleRubricSubmit;
     </script>
+
+    <style>
+        .group-info-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 2px solid var(--primary-light);
+            animation: fadeIn 0.5s ease;
+        }
+
+        .group-info-card .group-header {
+            margin-bottom: 1rem;
+        }
+
+        .group-info-card h2 {
+            color: var(--primary);
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .project-info {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .criterion-card {
+            background: white;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            border: 2px solid var(--primary-light);
+            transition: var(--transition);
+        }
+
+        .criterion-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .criterion-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 0.5rem;
+        }
+
+        .criterion-header h3 {
+            color: var(--text-color);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .criterion-header i {
+            color: var(--primary);
+        }
+
+        .max-score {
+            color: var(--primary);
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .criterion-description {
+            color: var(--text-light);
+            margin-bottom: 1rem;
+            font-size: 0.95rem;
+        }
+
+        .score-input-container {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .score-input {
+            width: 80px;
+            padding: 0.5rem;
+            border: 2px solid var(--primary-light);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            text-align: center;
+            transition: var(--transition);
+        }
+
+        .score-input:hover {
+            border-color: var(--primary);
+        }
+
+        .score-input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.1);
+            outline: none;
+        }
+
+        .max-score-label {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .comments-section {
+            background: white;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            border: 2px solid var(--primary-light);
+        }
+
+        .comments-section label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: var(--text-color);
+            margin-bottom: 1rem;
+        }
+
+        .comments-section i {
+            color: var(--primary);
+        }
+
+        textarea {
+            min-height: 120px;
+            resize: vertical;
+        }
+
+        .total-score {
+            background: white;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin: 2rem 0;
+            text-align: center;
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--text-color);
+            border: 2px solid var(--primary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+        }
+
+        .total-score i {
+            color: var(--primary);
+        }
+
+        #total {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 1rem 1.5rem;
+            border-radius: var(--radius);
+            color: white;
+            font-weight: 500;
+            display: none;
+            animation: slideIn 0.3s ease;
+            z-index: 1000;
+        }
+
+        .notification.error {
+            background-color: var(--error);
+        }
+
+        .notification.success {
+            background-color: var(--success);
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .project-info {
+                flex-direction: column;
+                align-items: flex-start;
+            }
+
+            .criterion-header {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 0.5rem;
+            }
+
+            .score-input {
+                width: 100%;
+            }
+
+            .score-input-container {
+                width: 100%;
+            }
+
+            .total-score {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+        }
+
+        .rubric-management {
+            background: white;
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 2px solid var(--primary-light);
+        }
+
+        .rubric-selector {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .rubric-selector h3 {
+            color: var(--text-color);
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin: 0;
+        }
+
+        .rubric-selector i {
+            color: var(--primary);
+        }
+
+        .rubric-select {
+            flex: 1;
+            padding: 0.5rem;
+            border: 2px solid var(--primary-light);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            min-width: 200px;
+            transition: var(--transition);
+        }
+
+        .rubric-select:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 180, 216, 0.1);
+            outline: none;
+        }
+
+        .create-rubric-btn {
+            padding: 0.5rem 1rem;
+            background: var(--primary);
+            color: white;
+            border: none;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: var(--transition);
+        }
+
+        .create-rubric-btn:hover {
+            background: var(--primary-dark);
+            transform: translateY(-1px);
+        }
+
+        .criterion-input {
+            background: var(--primary-light);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .criterion-input-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .criterion-input-header h4 {
+            margin: 0;
+            color: var(--text-color);
+        }
+
+        .remove-criterion-btn {
+            background: none;
+            border: none;
+            color: var(--error);
+            cursor: pointer;
+            padding: 0.25rem;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+        }
+
+        .remove-criterion-btn:hover {
+            background: rgba(244, 67, 54, 0.1);
+        }
+
+        .add-criterion-btn {
+            width: 100%;
+            padding: 0.75rem;
+            background: var(--primary-light);
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius);
+            color: var(--primary);
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            margin: 1rem 0;
+            transition: var(--transition);
+        }
+
+        .add-criterion-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        @media (max-width: 768px) {
+            .rubric-selector {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions button {
+                width: 100%;
+            }
+        }
+    </style>
 </body>
 </html> 

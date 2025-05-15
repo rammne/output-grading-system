@@ -344,6 +344,11 @@
                     totalScore: Number(document.getElementById('total').textContent),
                     timestamp: new Date().toISOString()
                 });
+
+                // Clear form fields
+                document.querySelectorAll('.score-input').forEach(input => input.value = '');
+                document.getElementById('comments').value = '';
+                document.getElementById('total').textContent = '0';
                 
                 showNotification('Grades submitted successfully!', 'success');
                 setTimeout(() => {
@@ -434,6 +439,11 @@
                     criteria,
                     createdAt: new Date().toISOString()
                 });
+
+                // Clear form fields
+                document.getElementById('rubricName').value = '';
+                document.getElementById('criteriaList').innerHTML = '';
+                addCriterion(); // Add one empty criterion
 
                 showNotification('Rubric created successfully!', 'success');
                 closeRubricModal();

@@ -143,20 +143,23 @@
     <style>
         .login-header {
             text-align: center;
-            margin-bottom: 2rem;
+            margin-bottom: 2.5rem;
         }
 
         .login-header i {
             color: var(--primary);
-            margin-bottom: 1rem;
+            margin-bottom: 1.5rem;
             font-size: 3.5rem;
+            background: linear-gradient(145deg, var(--primary) 0%, var(--primary-dark) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
         }
 
         .subtitle {
-            color: var(--text-color);
-            margin-top: 0.5rem;
+            color: var(--text-light);
+            margin-top: 0.75rem;
             font-size: 1.1rem;
-            opacity: 0.8;
+            font-weight: 500;
         }
 
         .form-group label i {
@@ -165,17 +168,27 @@
         }
 
         .login-container {
-            background: white;
-            border: 2px solid var(--primary);
+            background: linear-gradient(145deg, #ffffff 0%, var(--secondary) 100%);
+            border: 1px solid rgba(25, 118, 210, 0.1);
+            box-shadow: var(--shadow-lg);
+            max-width: 480px;
+            padding: 2.5rem;
+            border-radius: var(--radius-lg);
         }
 
         .form-input {
-            border-color: var(--primary-light);
+            border: 1px solid rgba(25, 118, 210, 0.2);
+            background: white;
+            transition: var(--transition);
+        }
+
+        .form-input:hover {
+            border-color: var(--primary);
         }
 
         .form-input:focus {
             border-color: var(--primary);
-            box-shadow: 0 0 0 4px rgba(0, 180, 216, 0.1);
+            box-shadow: 0 0 0 4px rgba(25, 118, 210, 0.1);
         }
 
         .notification {
@@ -189,14 +202,15 @@
             display: none;
             animation: slideIn 0.3s ease;
             z-index: 1000;
+            box-shadow: var(--shadow);
         }
 
         .notification.error {
-            background-color: var(--error);
+            background: linear-gradient(145deg, var(--error) 0%, #b71c1c 100%);
         }
 
         .notification.success {
-            background-color: var(--success);
+            background: linear-gradient(145deg, var(--success) 0%, #1b5e20 100%);
         }
 
         @keyframes slideIn {
@@ -212,7 +226,7 @@
 
         @media (max-width: 480px) {
             .login-header i {
-                font-size: 2.5em;
+                font-size: 2.75rem;
             }
 
             .subtitle {
@@ -224,6 +238,11 @@
                 right: 10px;
                 left: 10px;
                 text-align: center;
+            }
+
+            .login-container {
+                padding: 2rem;
+                margin: 1rem;
             }
         }
     </style>

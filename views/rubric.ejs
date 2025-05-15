@@ -215,24 +215,65 @@
 
         const loadRubrics = async (professorId) => {
             try {
+                console.log('Starting to load rubrics for professor:', professorId);
+                
                 const rubricsQuery = query(
                     collection(db, 'rubrics'),
                     where('professorId', '==', professorId)
                 );
                 
+                console.log('Fetching rubrics from Firestore...');
                 const querySnapshot = await getDocs(rubricsQuery);
-                const select = document.getElementById('rubricSelect');
+                console.log('Rubrics query completed. Found:', querySnapshot.size, 'rubrics');
                 
+                const select = document.getElementById('rubricSelect');
+                console.log('Current options in select:', select.options.length);
+                
+                // Clear existing options except the default one
+                while (select.options.length > 1) {
+                    select.remove(1);
+                }
+                console.log('Cleared existing options. Now has:', select.options.length);
+                
+                // Sort rubrics by creation date (newest first)
+                const rubrics = [];
                 querySnapshot.forEach(doc => {
-                    const rubric = doc.data();
+                    const rubricData = doc.data();
+                    console.log('Found rubric:', {
+                        id: doc.id,
+                        name: rubricData.name,
+                        professorId: rubricData.professorId,
+                        createdAt: rubricData.createdAt
+                    });
+                    rubrics.push({
+                        id: doc.id,
+                        ...rubricData
+                    });
+                });
+                
+                rubrics.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+                console.log('Sorted rubrics:', rubrics.map(r => r.name));
+                
+                // Add sorted rubrics to select
+                rubrics.forEach(rubric => {
                     const option = document.createElement('option');
-                    option.value = doc.id;
+                    option.value = rubric.id;
                     option.textContent = rubric.name;
                     select.appendChild(option);
+                    console.log('Added rubric to select:', rubric.name);
                 });
+
+                // If no rubrics were loaded (except default), log for debugging
+                if (select.options.length === 1) {
+                    console.log('No custom rubrics found for professor:', professorId);
+                    showNotification("No custom rubrics found. You can create one using the 'Create New Rubric' button.", "info");
+                } else {
+                    console.log(`Successfully loaded ${select.options.length - 1} custom rubrics`);
+                }
             } catch (error) {
-                console.error("Error loading rubrics:", error);
-                showNotification("Error loading rubrics");
+                console.error("Detailed error loading rubrics:", error);
+                console.error("Error stack:", error.stack);
+                showNotification("Error loading rubrics. Please check console for details.");
             }
         };
 
@@ -364,17 +405,58 @@
 
         // Initialize the page
         document.addEventListener('DOMContentLoaded', async () => {
+            console.log('Page loaded, checking authentication...');
             const professor = checkAuth();
-            if (!professor) return;
+            if (!professor) {
+                console.log('No professor data found, redirecting to login...');
+                return;
+            }
             
-            await loadGroupInfo();
-            await loadRubrics(professor.professorId);
-            loadCriteria();
-            await loadExistingGrade(professor.professorId);
+            console.log('Professor authenticated:', professor);
             
-            document.getElementById('grading-form').addEventListener('submit', handleSubmit);
-            document.getElementById('rubricSelect').addEventListener('change', handleRubricChange);
-            document.getElementById('createRubricForm').addEventListener('submit', handleRubricSubmit);
+            try {
+                await loadGroupInfo();
+                console.log('Group info loaded successfully');
+                
+                await loadRubrics(professor.professorId);
+                console.log('Initial rubrics load completed');
+                
+                loadCriteria();
+                console.log('Criteria loaded successfully');
+                
+                await loadExistingGrade(professor.professorId);
+                console.log('Existing grades loaded successfully');
+                
+                // Add refresh button for rubrics
+                const rubricSelector = document.querySelector('.rubric-selector');
+                const refreshButton = document.createElement('button');
+                refreshButton.type = 'button';
+                refreshButton.className = 'refresh-rubrics-btn';
+                refreshButton.innerHTML = '<i class="fas fa-sync-alt"></i>';
+                refreshButton.title = 'Refresh Rubrics';
+                refreshButton.onclick = async () => {
+                    console.log('Refresh button clicked, reloading rubrics...');
+                    try {
+                        await loadRubrics(professor.professorId);
+                        showNotification('Rubrics refreshed successfully', 'success');
+                    } catch (error) {
+                        console.error('Error refreshing rubrics:', error);
+                        showNotification('Failed to refresh rubrics', 'error');
+                    }
+                };
+                rubricSelector.appendChild(refreshButton);
+                
+                // Set up event listeners
+                document.getElementById('grading-form').addEventListener('submit', handleSubmit);
+                document.getElementById('rubricSelect').addEventListener('change', handleRubricChange);
+                document.getElementById('createRubricForm').addEventListener('submit', handleRubricSubmit);
+                
+                console.log('All event listeners set up successfully');
+            } catch (error) {
+                console.error("Error during page initialization:", error);
+                console.error("Error stack:", error.stack);
+                showNotification("Error loading page content. Please check console for details.");
+            }
         });
 
         // Make functions available globally
@@ -822,6 +904,50 @@
 
             .form-actions button {
                 width: 100%;
+            }
+        }
+
+        .refresh-rubrics-btn {
+            padding: 0.5rem;
+            background: var(--primary-light);
+            color: var(--primary);
+            border: 1px solid var(--primary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: var(--transition);
+            width: 36px;
+            height: 36px;
+        }
+
+        .refresh-rubrics-btn:hover {
+            background: var(--primary);
+            color: white;
+            transform: rotate(180deg);
+        }
+
+        .refresh-rubrics-btn i {
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .rubric-selector {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .form-actions {
+                flex-direction: column;
+            }
+
+            .form-actions button {
+                width: 100%;
+            }
+
+            .refresh-rubrics-btn {
+                align-self: flex-end;
             }
         }
     </style>

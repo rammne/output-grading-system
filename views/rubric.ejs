@@ -110,7 +110,7 @@
     <div id="notification" class="notification"></div>
 
     <script type="module">
-        import { doc, getDoc, setDoc, collection, query, where, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
+        import { doc, getDoc, setDoc, collection, query, where, getDocs, orderBy } from 'https://www.gstatic.com/firebasejs/10.7.0/firebase-firestore.js';
         import { db } from '/js/firebase-config.js';
 
         const groupId = '<%= groupId %>';
@@ -215,11 +215,12 @@
 
         const loadRubrics = async (professorId) => {
             try {
-                console.log('Starting to load rubrics for professor:', professorId);
+                console.log('Starting to load all rubrics...');
                 
+                // Remove professorId filter to get all rubrics
                 const rubricsQuery = query(
                     collection(db, 'rubrics'),
-                    where('professorId', '==', professorId)
+                    orderBy('createdAt', 'desc') // Sort by creation date directly in query
                 );
                 
                 console.log('Fetching rubrics from Firestore...');
@@ -235,8 +236,7 @@
                 }
                 console.log('Cleared existing options. Now has:', select.options.length);
                 
-                // Sort rubrics by creation date (newest first)
-                const rubrics = [];
+                // Add rubrics to select with professor name
                 querySnapshot.forEach(doc => {
                     const rubricData = doc.data();
                     console.log('Found rubric:', {
@@ -245,30 +245,23 @@
                         professorId: rubricData.professorId,
                         createdAt: rubricData.createdAt
                     });
-                    rubrics.push({
-                        id: doc.id,
-                        ...rubricData
-                    });
-                });
-                
-                rubrics.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-                console.log('Sorted rubrics:', rubrics.map(r => r.name));
-                
-                // Add sorted rubrics to select
-                rubrics.forEach(rubric => {
+                    
                     const option = document.createElement('option');
-                    option.value = rubric.id;
-                    option.textContent = rubric.name;
+                    option.value = doc.id;
+                    // Add professor name if available, otherwise just show rubric name
+                    option.textContent = rubricData.professorName 
+                        ? `${rubricData.name} (by ${rubricData.professorName})`
+                        : rubricData.name;
                     select.appendChild(option);
-                    console.log('Added rubric to select:', rubric.name);
+                    console.log('Added rubric to select:', option.textContent);
                 });
 
-                // If no rubrics were loaded (except default), log for debugging
+                // Update notification message
                 if (select.options.length === 1) {
-                    console.log('No custom rubrics found for professor:', professorId);
-                    showNotification("No custom rubrics found. You can create one using the 'Create New Rubric' button.", "info");
+                    console.log('No rubrics found in the system');
+                    showNotification("No rubrics found. You can create one using the 'Create New Rubric' button.", "info");
                 } else {
-                    console.log(`Successfully loaded ${select.options.length - 1} custom rubrics`);
+                    console.log(`Successfully loaded ${select.options.length - 1} rubrics`);
                 }
             } catch (error) {
                 console.error("Detailed error loading rubrics:", error);
@@ -518,6 +511,8 @@
                 await setDoc(rubricRef, {
                     name: rubricName,
                     professorId: professor.professorId,
+                    professorName: professor.professorName,
+                    department: professor.department,
                     criteria,
                     createdAt: new Date().toISOString()
                 });
@@ -530,14 +525,11 @@
                 showNotification('Rubric created successfully!', 'success');
                 closeRubricModal();
                 
-                // Add new rubric to select options
-                const select = document.getElementById('rubricSelect');
-                const option = document.createElement('option');
-                option.value = rubricRef.id;
-                option.textContent = rubricName;
-                select.appendChild(option);
+                // Refresh the rubrics list
+                await loadRubrics(professor.professorId);
                 
-                // Select the new rubric
+                // Select the newly created rubric
+                const select = document.getElementById('rubricSelect');
                 select.value = rubricRef.id;
                 currentCriteria = criteria;
                 loadCriteria();
